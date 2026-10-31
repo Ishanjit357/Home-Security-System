@@ -1,0 +1,106 @@
+#define BLYNK_TEMPLATE_ID "TMPL3uGqXFQor"
+#define BLYNK_TEMPLATE_NAME "Home Security"
+#define BLYNK_AUTH_TOKEN "k4G8-fPL1AoyID_0hHfIv1AbLuvfADPV"
+
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <WiFiClientSecure.h>
+#include <UniversalTelegramBot.h>
+#include <BlynkSimpleEsp32.h>
+
+char ssid[] = "VIVO T4X";
+char pass[] = "asdfghjkl";
+
+#define BOT_TOKEN "7952805480:AAF21U41YisOR25MC18E4fLjrmfh6JMp-3Q"
+#define CHAT_ID "1289890482"
+
+WiFiClientSecure client;
+UniversalTelegramBot bot(BOT_TOKEN, client);
+
+// Pins
+int pir1 = 13;
+int pir2 = 12;
+int led = 14;
+int buzzer = 27;
+
+// System state
+bool systemArmed = true;
+
+void setup()
+{
+  Serial.begin(115200);
+
+  pinMode(pir1, INPUT);
+  pinMode(pir2, INPUT);
+  pinMode(led, OUTPUT);
+  pinMode(buzzer, OUTPUT);
+
+  WiFi.begin("VIVO T4X", "asdfghjkl");
+
+  Serial.print("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("\nWiFi Connected!");
+
+  client.setInsecure(); // Important for ESP32
+
+  digitalWrite(led, LOW);
+  digitalWrite(buzzer, LOW);
+
+  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+
+  Serial.println("System Ready...");
+}
+
+// Blynk Button V1 → Arm/Disarm
+BLYNK_WRITE(V1)
+{
+  systemArmed = param.asInt();
+
+  if (systemArmed)
+    Serial.println("System ARMED");
+  else
+    Serial.println("System DISARMED");
+}
+
+void loop()
+{
+  Blynk.run();
+
+  int motion1 = digitalRead(pir1);
+  int motion2 = digitalRead(pir2);
+
+  // Data logging
+  Serial.print("PIR1: ");
+  Serial.print(motion1);
+  Serial.print(" | PIR2: ");
+  Serial.println(motion2);
+
+  if (systemArmed && (motion1 == HIGH || motion2 == HIGH))
+  {
+    Serial.println("⚠ Motion Detected!");
+
+    digitalWrite(led, HIGH);
+    digitalWrite(buzzer, HIGH);
+
+    Blynk.virtualWrite(V0, 1);
+
+    // Notification
+    Blynk.logEvent("intruder_alert", "⚠ Intruder Detected!");
+    bot.sendMessage("1289890482", "⚠ Intruder Detected!", "");
+
+    delay(5000);
+  }
+  else
+  {
+    digitalWrite(led, LOW);
+    digitalWrite(buzzer, LOW);
+
+    Blynk.virtualWrite(V0, 0);
+  }
+
+  delay(1000);
+}
